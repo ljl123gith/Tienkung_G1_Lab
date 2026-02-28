@@ -51,10 +51,10 @@ class G1Env(VecEnv):
 
     def __init__(
         self,
-        cfg: G1FlatEnvCfg | G1RoughEnvCfg ,
+        cfg: G1FlatEnvCfg | G1RoughEnvCfg,
         headless: bool,
     ):
-        self.cfg: G1FlatEnvCfg | G1RoughEnvCfg 
+        self.cfg: G1FlatEnvCfg | G1RoughEnvCfg
 
         self.cfg = cfg
         self.headless = headless
@@ -256,11 +256,11 @@ class G1Env(VecEnv):
         feet_pos_translated = feet_pos_w - root_pos_w.unsqueeze(1)  # (num_envs, num_feet, 3)
         feet_vel_translated = feet_vel_w - root_vel_w.unsqueeze(1)  # (num_envs, num_feet, 3)
         
-        # Rotate to body frame using Isaac Lab's quat_apply_inverse
+        # Rotate to body frame using Isaac Lab's quat_rotate_inverse
         num_feet = feet_pos_translated.shape[1]
         for i in range(num_feet):
-            self.feet_pos_in_body[:, i, :] = math_utils.quat_apply_inverse(root_quat_w, feet_pos_translated[:, i, :])
-            self.feet_vel_in_body[:, i, :] = math_utils.quat_apply_inverse(root_quat_w, feet_vel_translated[:, i, :])
+            self.feet_pos_in_body[:, i, :] = math_utils.quat_rotate_inverse(root_quat_w, feet_pos_translated[:, i, :])
+            self.feet_vel_in_body[:, i, :] = math_utils.quat_rotate_inverse(root_quat_w, feet_vel_translated[:, i, :])
 
     def compute_observations(self):
         """Compute full observations including history and sensor data."""

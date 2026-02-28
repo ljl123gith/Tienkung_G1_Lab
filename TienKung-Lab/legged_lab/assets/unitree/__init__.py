@@ -10,3 +10,4 @@
 # with modifications by Legged Lab Project (BSD-3-Clause license).
 
 from legged_lab.assets.unitree.unitree import *
+from legged_lab.assets.unitree.unitree_g1_25 import G1_CFG_25

@@ -33,13 +33,15 @@ from legged_lab.envs.tienkung.walk_with_sensor_cfg import (
     TienKungWalkWithSensorFlatEnvCfg,
 )
 
-from legged_lab.envs.g1.g1_env import G1Env
 from legged_lab.envs.g1.g1_config import (
     G1FlatAgentCfg,
     G1FlatEnvCfg,
     G1RoughAgentCfg,
     G1RoughEnvCfg,
 )
+from legged_lab.envs.g1.g1_env import G1Env
+
+
 
 from legged_lab.envs.g1.g1_dwaq_env import G1DwaqEnv
 from legged_lab.envs.g1.g1_dwaq_config import (
@@ -47,13 +49,45 @@ from legged_lab.envs.g1.g1_dwaq_config import (
     G1DwaqEnvCfg,
 )
 
+from legged_lab.envs.g1.g1_walkamp_env import G1WalkAmpEnv
+from legged_lab.envs.g1.g1_walkamp_cfg import (
+    G1WalkAmpAgentCfg,
+    G1WalkAmpEnvCfg,
+)
+
+from legged_lab.envs.g1.g1_walkamp_env_25 import G1WalkAmpEnv_25
+from legged_lab.envs.g1.g1_walkamp_cfg_25 import (
+    G1WalkAmpAgentCfg_25,
+    G1WalkAmpEnvCfg_25,
+)
+
+
+from legged_lab.envs.g1.g1_env_25 import G1Env_25
+from legged_lab.envs.g1.g1_config_25 import (
+    G1FlatAgentCfg_25,
+    G1FlatEnvCfg_25,
+    G1RoughAgentCfg_25,
+    G1RoughEnvCfg_25,
+)
+
+
+from legged_lab.envs.g1.ljl_g1_25_env import G125Env
+from legged_lab.envs.g1.ljl_walk_25_cfg import (
+    G125WalkFlatEnvCfg,
+    G125WalkAgentCfg,
+)
+
+
 from legged_lab.envs.h1.h1_config import (
     H1FlatAgentCfg,
     H1FlatEnvCfg,
     H1RoughAgentCfg,
     H1RoughEnvCfg,
 )
+
+
 from legged_lab.utils.task_registry import task_registry
+
 
 
 task_registry.register("walk", TienKungEnv, TienKungWalkFlatEnvCfg(), TienKungWalkAgentCfg())
@@ -70,5 +104,15 @@ task_registry.register("h1_rough", BaseEnv, H1RoughEnvCfg(), H1RoughAgentCfg())
 
 task_registry.register("g1_flat", BaseEnv, G1FlatEnvCfg(), G1FlatAgentCfg())
 task_registry.register("g1_rough", G1Env, G1RoughEnvCfg(), G1RoughAgentCfg())
-task_registry.register("g1_dwaq", G1DwaqEnv, G1DwaqEnvCfg(), G1DwaqAgentCfg())
 
+
+
+task_registry.register("g1_dwaq", G1DwaqEnv, G1DwaqEnvCfg(), G1DwaqAgentCfg())
+task_registry.register("g1_walkamp", G1WalkAmpEnv, G1WalkAmpEnvCfg(), G1WalkAmpAgentCfg())
+
+task_registry.register("g1_flat_25", G1Env_25, G1FlatEnvCfg_25(), G1FlatAgentCfg_25())
+task_registry.register("g1_rough_25", G1Env_25, G1RoughEnvCfg_25(), G1RoughAgentCfg_25())
+task_registry.register("g1_walkamp_25", G1WalkAmpEnv_25, G1WalkAmpEnvCfg_25(), G1WalkAmpAgentCfg_25 ())
+
+task_registry.register("g1_amp_25", G125Env, G125WalkFlatEnvCfg(), G125WalkAgentCfg())
+ 

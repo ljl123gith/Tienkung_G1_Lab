@@ -18,8 +18,8 @@
 
 """Implementation of runners for environment-agent interaction."""
 
-from .amp_on_policy_runner import AmpOnPolicyRunner
+from .amp_on_policy_runner import AmpOnPolicyRunner,AmpOnPolicyRunner_25
 from .on_policy_runner import OnPolicyRunner
 from .dwaq_on_policy_runner import DWAQOnPolicyRunner
 
-__all__ = ["OnPolicyRunner", "AmpOnPolicyRunner", "DWAQOnPolicyRunner"]
+__all__ = ["OnPolicyRunner", "AmpOnPolicyRunner", "DWAQOnPolicyRunner", "AmpOnPolicyRunner_25"]

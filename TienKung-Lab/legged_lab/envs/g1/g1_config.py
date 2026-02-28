@@ -131,6 +131,14 @@ class G1FlatEnvCfg(BaseEnvCfg):
 class G1FlatAgentCfg(BaseAgentCfg):
     experiment_name: str = "g1_flat"
     wandb_project: str = "g1_flat"
+    
+    def __post_init__(self):
+        super().__post_init__()
+        # Use ActorCritic with History Encoder (no LSTM needed with history buffer)
+        self.policy.class_name = "ActorCritic"
+        self.policy.actor_hidden_dims = [512, 256, 128]
+        self.policy.critic_hidden_dims = [512, 256, 128]
+
 
 
 @configclass

@@ -6,6 +6,8 @@ __pycache__/
 # C extensions
 *.so
 
+
+
 # Distribution / packaging
 .Python
 build/
@@ -147,3 +149,21 @@ temp/
 .DS_Store
 Thumbs.db
 PROJECT_REVIEW.md=*
+
+# 忽略模型权重文件 (非常重要，动不动几百 MB)
+*.pt
+*.pth
+*.ckpt
+*.pkl
+
+# 忽略 Tensorboard 日志
+*.tfevents*
+
+# 忽略具体的日志目录
+logs/
+TienKung-Lab/logs/
+*/logs/
+
+# 忽略数据集文件夹 (如果有)
+datasets/
+data/

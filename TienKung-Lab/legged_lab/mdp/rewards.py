@@ -36,7 +36,7 @@ def track_lin_vel_xy_yaw_frame_exp(
     env: BaseEnv | TienKungEnv, std: float, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
 ) -> torch.Tensor:
     asset: Articulation = env.scene[asset_cfg.name]
-    vel_yaw = math_utils.quat_apply_inverse(
+    vel_yaw = math_utils.quat_rotate_inverse(
         math_utils.yaw_quat(asset.data.root_quat_w), asset.data.root_lin_vel_w[:, :3]
     )
     lin_vel_error = torch.sum(torch.square(env.command_generator.command[:, :2] - vel_yaw[:, :2]), dim=1)
@@ -172,7 +172,8 @@ def body_orientation_l2(
     env: BaseEnv | TienKungEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
 ) -> torch.Tensor:
     asset: Articulation = env.scene[asset_cfg.name]
-    body_orientation = math_utils.quat_apply_inverse(
+    # Note: quat_rotate_inverse was renamed to quat_rotate_inverse in Isaac Lab 0.38.0
+    body_orientation = math_utils.quat_rotate_inverse(
         asset.data.body_quat_w[:, asset_cfg.body_ids[0], :], asset.data.GRAVITY_VEC_W
     )
     return torch.sum(torch.square(body_orientation[:, :2]), dim=1)
@@ -523,7 +524,8 @@ def idle_when_commanded(
     cmd_magnitude = torch.linalg.norm(cmd_xy, dim=-1)
     
     # Get actual root velocity in yaw frame (same as track_lin_vel_xy uses)
-    vel_yaw = math_utils.quat_apply_inverse(
+    # Note: quat_rotate_inverse was renamed to quat_rotate_inverse in Isaac Lab 0.38.0
+    vel_yaw = math_utils.quat_rotate_inverse(
         math_utils.yaw_quat(asset.data.root_quat_w), asset.data.root_lin_vel_w[:, :3]
     )
     vel_magnitude = torch.linalg.norm(vel_yaw[:, :2], dim=-1)

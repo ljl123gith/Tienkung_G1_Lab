@@ -19,6 +19,7 @@
 """Helper functions."""
 
 from .motion_loader import AMPLoader
+from .motion_loader_amp import AMPLoader_25
 from .motion_loader_for_display import AMPLoaderDisplay
 from .utils import (
     Normalizer,
@@ -31,5 +32,6 @@ from .utils import (
 
 __all__ = [
     "AMPLoader",
+    "AMPLoader_25",
     "AMPLoaderDisplay",
 ]

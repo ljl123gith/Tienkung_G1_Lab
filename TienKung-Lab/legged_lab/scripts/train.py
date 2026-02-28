@@ -21,7 +21,7 @@ import argparse
 from isaaclab.app import AppLauncher
 
 from legged_lab.utils import task_registry
-from rsl_rl.runners import AmpOnPolicyRunner, OnPolicyRunner, DWAQOnPolicyRunner
+from rsl_rl.runners import AmpOnPolicyRunner, OnPolicyRunner, DWAQOnPolicyRunner,AmpOnPolicyRunner_25
 
 # local imports
 import legged_lab.utils.cli_args as cli_args  # isort: skip
@@ -61,7 +61,7 @@ torch.backends.cudnn.benchmark = False
 
 
 def train():
-    runner: OnPolicyRunner | AmpOnPolicyRunner
+    runner: OnPolicyRunner | AmpOnPolicyRunner_25
 
     env_class_name = args_cli.task
     env_cfg, agent_cfg = task_registry.get_cfgs(env_class_name)

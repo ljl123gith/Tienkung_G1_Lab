@@ -1,3 +1,11 @@
+# flake8: noqa
+# NOTE:
+# This is an executable Isaac Sim script. It intentionally:
+# - uses long help strings for CLI usability
+# - imports some modules after SimulationApp is started (E402)
+#
+# Keeping flake8 disabled for this file avoids noisy style errors that don't affect runtime.
+#
 # Copyright (c) 2021-2024, The RSL-RL Project Developers.
 # All rights reserved.
 # Original code is licensed under the BSD-3-Clause license.
@@ -20,21 +28,32 @@ import argparse
 import os
 
 import cv2
+import numpy as np
 import torch
 from isaaclab.app import AppLauncher
 
 from legged_lab.utils import task_registry
-from rsl_rl.runners import AmpOnPolicyRunner, OnPolicyRunner, DWAQOnPolicyRunner
+from rsl_rl.runners import AmpOnPolicyRunner, AmpOnPolicyRunner_25, DWAQOnPolicyRunner, OnPolicyRunner
 
 # local imports
 import legged_lab.utils.cli_args as cli_args  # isort: skip
+
+# NOTE:
+# Avoid using eval() for resolving runner classes. It's brittle (NameError if not imported)
+# and can be unsafe if config is untrusted. Use an explicit mapping instead.
+RUNNER_CLASS_MAP = {
+    "OnPolicyRunner": OnPolicyRunner,
+    "AmpOnPolicyRunner": AmpOnPolicyRunner,
+    "AmpOnPolicyRunner_25": AmpOnPolicyRunner_25,
+    "DWAQOnPolicyRunner": DWAQOnPolicyRunner,
+}
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Train an RL agent with RSL-RL.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
-parser.add_argument("--terrain", type=str, default="stairs", 
+parser.add_argument("--terrain", type=str, default="flat", 
                     choices=["stairs", "stairs_slope", "flat", "rough"],
                     help="Terrain type for play: stairs (纯台阶最难), stairs_slope (台阶+斜坡), flat (平地), rough (训练地形)")
 parser.add_argument("--difficulty", type=float, default=0.2,
@@ -48,6 +67,33 @@ parser.add_argument("--terrain_color", type=str, default="mdl_shingles",
                     help="Terrain color: concrete/grass/sand/dirt/rock/white/dark (简单颜色), mdl_* (真实MDL材质)")
 parser.add_argument("--no_gait", action="store_true",
                     help="Disable gait phase mechanism (for testing models trained without gait)")
+
+# Optional: override velocity commands at play-time.
+# If you don't pass these, we keep whatever is defined in the task config (same as training),
+# which is usually the safest way to evaluate a trained policy.
+parser.add_argument(
+    "--cmd_vx",
+    type=float,
+    default=None,
+    help="Override commanded forward velocity (m/s). If set, lin_vel_x range becomes (cmd_vx, cmd_vx).",
+)
+parser.add_argument(
+    "--cmd_vy",
+    type=float,
+    default=None,
+    help="Override commanded lateral velocity (m/s). If set, lin_vel_y range becomes (cmd_vy, cmd_vy).",
+)
+parser.add_argument(
+    "--cmd_wz",
+    type=float,
+    default=None,
+    help="Override commanded yaw rate (rad/s). If set, ang_vel_z range becomes (cmd_wz, cmd_wz).",
+)
+parser.add_argument(
+    "--cmd_no_heading",
+    action="store_true",
+    help="Disable heading-command mode at play time (use ang_vel_z command instead).",
+)
 
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
@@ -85,11 +131,48 @@ def play():
     env_cfg.scene.max_episode_length_s = 40.0
     env_cfg.scene.num_envs = 1
     env_cfg.scene.env_spacing = 6.0
-    env_cfg.commands.rel_standing_envs = 0.0
-    env_cfg.commands.ranges.lin_vel_x = (1.0, 1.0)
-    env_cfg.commands.ranges.lin_vel_y = (0.0, 0.0)
+    # IMPORTANT:
+    # Do NOT hard-force commands here; it can easily make a good policy look bad (e.g., always
+    # commanding max forward speed). We only override commands if the user explicitly requests it.
+    if args_cli.cmd_no_heading:
+        env_cfg.commands.heading_command = False
+        env_cfg.commands.rel_heading_envs = 0.0
+        print("[INFO] Heading command disabled (--cmd_no_heading).")
+
+    if args_cli.cmd_vx is not None:
+        env_cfg.commands.ranges.lin_vel_x = (args_cli.cmd_vx, args_cli.cmd_vx)
+    if args_cli.cmd_vy is not None:
+        env_cfg.commands.ranges.lin_vel_y = (args_cli.cmd_vy, args_cli.cmd_vy)
+    if args_cli.cmd_wz is not None:
+        env_cfg.commands.ranges.ang_vel_z = (args_cli.cmd_wz, args_cli.cmd_wz)
+
+    if (
+        args_cli.cmd_vx is not None
+        or args_cli.cmd_vy is not None
+        or args_cli.cmd_wz is not None
+    ):
+        print(
+            "[INFO] Overriding command ranges for play: "
+            f"lin_vel_x={env_cfg.commands.ranges.lin_vel_x}, "
+            f"lin_vel_y={env_cfg.commands.ranges.lin_vel_y}, "
+            f"ang_vel_z={env_cfg.commands.ranges.ang_vel_z}"
+        )
+
     env_cfg.commands.debug_vis = False  # Disable velocity command arrows
     env_cfg.scene.height_scanner.drift_range = (0.0, 0.0)
+
+    # ========== G1 专用防炸机设置：根据训练经验下调 PD 刚度 ==========
+    # 注意：这里是在 env 实例化之前修改 config，只影响本次 play，不影响训练。
+    if hasattr(env_cfg, "robot") and hasattr(env_cfg.robot, "actuators"):
+        print("[INFO] 正在强制重置 PD 参数以匹配更温和的设置（Kp≈20, Kd≈0.5）...")
+        for act_name, act_cfg in env_cfg.robot.actuators.items():
+            # 训练中常用的较软刚度范围，防止默认 100+ 的 Kp 导致抖动或炸机
+            try:
+                act_cfg.stiffness = 20.0
+                act_cfg.damping = 0.5
+                print(f"  - Actuator '{act_name}': set stiffness=20.0, damping=0.5")
+            except Exception as e:
+                print(f"  - 警告: 无法修改 '{act_name}' 的 PD 参数: {e}")
 
     # Disable gait phase if --no_gait is specified
     if args_cli.no_gait and hasattr(env_cfg, 'robot') and hasattr(env_cfg.robot, 'gait_phase'):
@@ -275,6 +358,12 @@ def play():
 
     env_class = task_registry.get_task_class(env_class_name)
     env = env_class(env_cfg, args_cli.headless)
+    # Debug: show the initial command after reset (helps diagnose "robot falls immediately")
+    try:
+        cmd0 = env.command_generator.command[0].detach().cpu().numpy()
+        print(f"[INFO] Initial command (env0) = {cmd0}")
+    except Exception as e:
+        print(f"[WARN] Failed to read initial command from env: {e}")
 
     log_root_path = os.path.join("logs", agent_cfg.experiment_name)
     log_root_path = os.path.abspath(log_root_path)
@@ -282,9 +371,50 @@ def play():
     resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
     log_dir = os.path.dirname(resume_path)
 
-    runner_class: OnPolicyRunner | AmpOnPolicyRunner | DWAQOnPolicyRunner = eval(agent_cfg.runner_class_name)
-    runner = runner_class(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
+    runner_name = agent_cfg.runner_class_name
+    runner_class = RUNNER_CLASS_MAP.get(runner_name, None)
+    if runner_class is None:
+        available = ", ".join(sorted(RUNNER_CLASS_MAP.keys()))
+        raise ValueError(
+            f"Unknown runner_class_name={runner_name!r}. Available: {available}. "
+            "Check your agent config (runner_class_name)."
+        )
+    print(f"[INFO] Using runner_class_name={runner_name} -> {runner_class.__name__}")
+
+    # ⬇️⬇️⬇️ 核心修改：在创建 Runner 之前，强制开启经验归一化 ⬇️⬇️⬇️
+    print("[INFO] 正在检查 agent_cfg 配置，用于强制开启 empirical_normalization...")
+    agent_cfg_dict = agent_cfg.to_dict() if hasattr(agent_cfg, "to_dict") else dict(agent_cfg)
+    agent_cfg_dict["empirical_normalization"] = False
+    print("[INFO] 已强制设置 empirical_normalization = True（仅影响当前 play 会话）")
+
+    # 使用修改后的配置初始化 Runner
+    runner = runner_class(env, agent_cfg_dict, log_dir=log_dir, device=agent_cfg.device)
     runner.load(resume_path, load_optimizer=False)
+
+    # ========== 🛑 插入调试代码开始: 检查归一化参数 (Observation Normalizer) 🛑 ==========
+    print("\n" + "=" * 50)
+    print("正在检查归一化参数 (Observation Normalizer)...")
+    if hasattr(runner, "obs_normalizer"):
+        # 只有经验归一化开启时，obs_normalizer 才有 running_mean / running_var
+        mean = getattr(runner.obs_normalizer, "running_mean", None)
+        var = getattr(runner.obs_normalizer, "running_var", None)
+        if mean is not None and var is not None:
+            print(f"Normalizer Mean (前5个): {mean[:5].detach().cpu().numpy()}")
+            print(f"Normalizer Var  (前5个): {var[:5].detach().cpu().numpy()}")
+
+            # 核心判断：如果 Mean 全是 0，Var 全是 1，说明很可能没加载成功（仍是默认初始化）
+            is_default = bool(torch.all(mean == 0).item()) and bool(torch.all(var == 1).item())
+            if is_default:
+                print("❌ 严重警告: 归一化参数看起来是默认值(0 和 1)！模型可能在“裸奔”。")
+                print("   请检查 checkpoint 是否保存了 normalizer，或 load 路径是否正确。")
+            else:
+                print("✅ 归一化参数已加载 (不全为 0/1)，与训练时保持一致。")
+        else:
+            print("ℹ️  obs_normalizer 没有 running_mean/running_var（可能当前配置关闭了经验归一化）。")
+    else:
+        print("❌ 错误: Runner 中没有找到 obs_normalizer 属性！")
+    print("=" * 50 + "\n")
+    # ========== 🛑 插入调试代码结束 🛑 ==========
 
     # Check if using ActorCriticDepth which requires history and optionally rgb_image
     use_depth_policy = hasattr(runner.alg.policy, 'history_encoder')
@@ -363,11 +493,88 @@ def play():
 
     obs, _ = env.get_observations()
     extras = env.extras  # Get initial extras
-    
+         # ================= 🌟 新增：开局热身阶段 (Warm-up) 🌟 =================
+    # ======================================================================
+    print("[INFO] 正在执行开局热身 (安全落地并填充历史缓冲区)...")
+    # 执行 30 步 (大约 0.6 秒) 的零动作。
+    # 在 IsaacLab 中，输入全 0 动作等于维持机器人默认的 Default Joint Position 站立姿态
+    for _ in range(60):
+        zero_actions = torch.zeros((env.num_envs, env.num_actions), device=env.device)
+        obs, _, _, extras = env.step(zero_actions)
+                
+    print("[INFO] 热身完毕，历史缓冲已正常，神经网络正式接管！")
+    # ======================================================================    
     # Reset trajectory history with initial observation if using depth policy
     if use_depth_policy:
         normalized_obs = runner.obs_normalizer(obs) if runner.empirical_normalization else obs
         trajectory_history = torch.cat((trajectory_history[:, 1:], normalized_obs.unsqueeze(1)), dim=1)
+
+    # ------------------------------------------------------------------
+    # 简单的 root 速度 / 位置 vs 命令速度 可视化（使用 OpenCV 绘制折线）
+    # ------------------------------------------------------------------
+    max_history = 200  # 保留最近 N 步
+    cmd_vx_hist: list[float] = []
+    root_vx_hist: list[float] = []
+    root_x_hist: list[float] = []
+
+    def update_debug_plot():
+        """在独立窗口中画出 cmd_vx 与 root_vx 的对比曲线，并显示 root_x。"""
+        if len(cmd_vx_hist) < 2:
+            return
+        w, h = 320, 240
+        img = np.zeros((h, w, 3), dtype=np.uint8)
+
+        # 坐标系：x 轴是时间，y 轴是速度，简单归一化到 [-1.5, 1.5] 区间
+        vx_min, vx_max = -1.5, 1.5
+        n = len(cmd_vx_hist)
+        xs = np.linspace(0, w - 1, n, dtype=np.int32)
+
+        def to_y(v):
+            v_clamped = np.clip(v, vx_min, vx_max)
+            norm = (v_clamped - vx_min) / (vx_max - vx_min)
+            return int((1.0 - norm) * (h - 20)) + 10
+
+        # 画 cmd_vx（绿色）和 root_vx（蓝色）
+        for i in range(1, n):
+            cv2.line(
+                img,
+                (xs[i - 1], to_y(cmd_vx_hist[i - 1])),
+                (xs[i], to_y(cmd_vx_hist[i])),
+                (0, 255, 0),
+                2,
+            )
+            cv2.line(
+                img,
+                (xs[i - 1], to_y(root_vx_hist[i - 1])),
+                (xs[i], to_y(root_vx_hist[i])),
+                (255, 0, 0),
+                2,
+            )
+
+        # 文本信息
+        cv2.putText(
+            img,
+            f"cmd_vx (green), root_vx (blue)",
+            (5, 15),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.4,
+            (255, 255, 255),
+            1,
+            cv2.LINE_AA,
+        )
+        cv2.putText(
+            img,
+            f"root_x: {root_x_hist[-1]:.3f}",
+            (5, h - 10),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (200, 200, 200),
+            1,
+            cv2.LINE_AA,
+        )
+
+        cv2.imshow("Cmd vs Root Velocity", img)
+        cv2.waitKey(1)
 
     while simulation_app.is_running():
 
@@ -380,6 +587,28 @@ def play():
             
             # All envs now return (obs, rewards, dones, extras) - Isaac Lab convention
             obs, _, dones, extras = env.step(actions)
+
+            # ----- Debug: 记录并可视化 root 速度/位置 与 命令速度 -----
+            try:
+                # env.command_generator.command: [vx, vy, wz, ...]
+                cmd = env.command_generator.command[0].detach().cpu().numpy()
+                root_vel = env.robot.data.root_lin_vel_b[0].detach().cpu().numpy()
+                root_pos = env.robot.data.root_pos_w[0].detach().cpu().numpy()
+
+                cmd_vx_hist.append(float(cmd[0]))
+                root_vx_hist.append(float(root_vel[0]))
+                root_x_hist.append(float(root_pos[0]))
+
+                # 限制历史长度
+                if len(cmd_vx_hist) > max_history:
+                    cmd_vx_hist.pop(0)
+                    root_vx_hist.pop(0)
+                    root_x_hist.pop(0)
+
+                update_debug_plot()
+            except Exception:
+                # 如果某些任务结构不同（没有 command_generator 或 root_vel），静默忽略
+                pass
             
             # Reset history for terminated environments
             if use_depth_policy:
@@ -387,6 +616,9 @@ def play():
                 if len(reset_env_ids) > 0:
                     trajectory_history[reset_env_ids] = 0
             
+   
+
+
             # Display RGB image in real-time using cv2.imshow
             if hasattr(env, 'rgb_camera') and env.rgb_camera is not None:
                 try:
@@ -406,7 +638,7 @@ def play():
                     # Display in window
                     cv2.imshow("RGB Camera View", rgb_img_resized)
                     cv2.waitKey(1)  # Required for window to update
-                except Exception as e:
+                except Exception:
                     pass  # Silently ignore errors
 
 

@@ -82,10 +82,12 @@ class SceneCfg(InteractiveSceneCfg):
         )
 
         if config.height_scanner.enable_height_scan:
+            # Note: ray_alignment parameter is not supported in Isaac Lab 0.38.0
+            # attach_yaw_only=True means only yaw rotation is tracked (suitable for height scanning)
             self.height_scanner = RayCasterCfg(
                 prim_path="{ENV_REGEX_NS}/Robot/" + config.height_scanner.prim_body_name,
                 offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 20.0)),
-                ray_alignment="yaw",
+                attach_yaw_only=True,  # Required parameter: only track yaw orientation for height scanning
                 pattern_cfg=patterns.GridPatternCfg(
                     resolution=config.height_scanner.resolution, size=config.height_scanner.size
                 ),
@@ -96,10 +98,12 @@ class SceneCfg(InteractiveSceneCfg):
             )
 
         if config.lidar.enable_lidar:
+            # Note: ray_alignment parameter is not supported in Isaac Lab 0.38.0
+            # attach_yaw_only=True means only yaw rotation is tracked (suitable for LiDAR scanning)
             self.lidar = RayCasterCfg(
                 prim_path="{ENV_REGEX_NS}/Robot/" + config.lidar.prim_body_name,
                 offset=RayCasterCfg.OffsetCfg(pos=config.lidar.offset, rot=config.lidar.rotation),
-                ray_alignment="yaw",
+                attach_yaw_only=True,  # Required parameter: only track yaw orientation for LiDAR
                 pattern_cfg=config.lidar.pattern_cfg,
                 debug_vis=config.lidar.debug_vis,
                 mesh_prim_paths=config.lidar.mesh_prim_paths,

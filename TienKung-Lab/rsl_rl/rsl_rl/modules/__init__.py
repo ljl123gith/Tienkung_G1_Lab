@@ -21,7 +21,7 @@
 from .actor_critic import ActorCritic
 from .actor_critic_recurrent import ActorCriticRecurrent
 from .actor_critic_DWAQ import ActorCritic_DWAQ
-from .discriminator import Discriminator
+from .discriminator import Discriminator, Discriminator_WGAN_GP
 from .normalizer import EmpiricalNormalization
 from .rnd import RandomNetworkDistillation
 from .student_teacher import StudentTeacher
@@ -36,4 +36,5 @@ __all__ = [
     "StudentTeacher",
     "StudentTeacherRecurrent",
     "Discriminator",
+    "Discriminator_WGAN_GP",
 ]

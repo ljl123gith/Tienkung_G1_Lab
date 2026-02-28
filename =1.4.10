@@ -1,0 +1,46 @@
+Looking in indexes: https://pypi.tuna.tsinghua.edu.cn/simple
+Collecting matplotlib
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/cb/aa/7ab67f2b729ae6a91bcf9dcac0affb95fb8c56f7fd2b2af894ae0b0cf6fa/matplotlib-3.10.8-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (8.7 MB)
+Collecting requests
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/1e/db/4254e3eabe8020b458f1a747140d32277ec7a271daf1d235b70dc0b4e6e3/requests-2.32.5-py3-none-any.whl (64 kB)
+Collecting six
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl (11 kB)
+Collecting more-itertools
+  Downloading https://pypi.tuna.tsinghua.edu.cn/packages/a4/8e/469e5a4a2f5855992e425f3cb33804cc07bf18d48f2db061aec61ce50270/more_itertools-10.8.0-py3-none-any.whl (69 kB)
+Requirement already satisfied: imageio in /home/ljl/.local/lib/python3.10/site-packages (2.9.0)
+Collecting mujoco
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/71/95/ba02262c7a7a786a64b8d77315e7e4d3c77598ff63d8cd605ba2b96ec349/mujoco-3.4.0-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (6.9 MB)
+Collecting pyglet
+  Downloading https://pypi.tuna.tsinghua.edu.cn/packages/73/eb/872c18852bc1b9f39e7a14e992ebdc0bb6535227b2828a2bb737f6aa81b3/pyglet-2.1.12-py3-none-any.whl (1.0 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.0/1.0 MB 7.9 MB/s  0:00:00
+Collecting contourpy>=1.0.1 (from matplotlib)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/32/5c/1ee32d1c7956923202f00cf8d2a14a62ed7517bdc0ee1e55301227fc273c/contourpy-1.3.2-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (325 kB)
+Collecting cycler>=0.10 (from matplotlib)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/e7/05/c19819d5e3d95294a6f5947fb9b9629efb316b96de511b418c53d245aae6/cycler-0.12.1-py3-none-any.whl (8.3 kB)
+Collecting fonttools>=4.22.0 (from matplotlib)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/69/69/4ca02ee367d2c98edcaeb83fc278d20972502ee071214ad9d8ca85e06080/fonttools-4.61.1-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (4.9 MB)
+Collecting kiwisolver>=1.3.1 (from matplotlib)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/d4/42/0f333164e6307a0687d1eb9ad256215aae2f4bd5d28f4653d6cd319a3ba3/kiwisolver-1.4.9-cp310-cp310-manylinux_2_12_x86_64.manylinux2010_x86_64.whl (1.6 MB)
+Requirement already satisfied: numpy>=1.23 in /home/ljl/.local/lib/python3.10/site-packages (from matplotlib) (1.26.4)
+Requirement already satisfied: packaging>=20.0 in /home/ljl/.local/lib/python3.10/site-packages (from matplotlib) (25.0)
+Requirement already satisfied: pillow>=8 in /home/ljl/miniconda3/envs/isaaclab_new/lib/python3.10/site-packages (from matplotlib) (12.0.0)
+Requirement already satisfied: pyparsing>=3 in /home/ljl/.local/lib/python3.10/site-packages (from matplotlib) (3.2.5)
+Requirement already satisfied: python-dateutil>=2.7 in /home/ljl/.local/lib/python3.10/site-packages (from matplotlib) (2.9.0.post0)
+Collecting charset_normalizer<4,>=2 (from requests)
+  Downloading https://pypi.tuna.tsinghua.edu.cn/packages/36/3b/60cbd1f8e93aa25d1c669c649b7a655b0b5fb4c571858910ea9332678558/charset_normalizer-3.4.4-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (153 kB)
+Requirement already satisfied: idna<4,>=2.5 in /home/ljl/.local/lib/python3.10/site-packages (from requests) (3.11)
+Collecting urllib3<3,>=1.21.1 (from requests)
+  Downloading https://pypi.tuna.tsinghua.edu.cn/packages/39/08/aaaad47bc4e9dc8c725e68f9d04865dbcb2052843ff09c97b08904852d84/urllib3-2.6.3-py3-none-any.whl (131 kB)
+Requirement already satisfied: certifi>=2017.4.17 in /home/ljl/.local/lib/python3.10/site-packages (from requests) (2025.11.12)
+Requirement already satisfied: absl-py in /home/ljl/.local/lib/python3.10/site-packages (from mujoco) (2.2.2)
+Requirement already satisfied: etils[epath] in /home/ljl/.local/lib/python3.10/site-packages (from mujoco) (1.12.2)
+Requirement already satisfied: glfw in /home/ljl/.local/lib/python3.10/site-packages (from mujoco) (2.9.0)
+Requirement already satisfied: pyopengl in /home/ljl/.local/lib/python3.10/site-packages (from mujoco) (3.1.10)
+Requirement already satisfied: fsspec in /home/ljl/.local/lib/python3.10/site-packages (from etils[epath]->mujoco) (2025.12.0)
+Requirement already satisfied: importlib_resources in /home/ljl/.local/lib/python3.10/site-packages (from etils[epath]->mujoco) (6.5.2)
+Requirement already satisfied: typing_extensions in /home/ljl/.local/lib/python3.10/site-packages (from etils[epath]->mujoco) (4.15.0)
+Collecting zipp (from etils[epath]->mujoco)
+  Using cached https://pypi.tuna.tsinghua.edu.cn/packages/2e/54/647ade08bf0db230bfea292f893923872fd20be6ac6f53b2b936ba839d75/zipp-3.23.0-py3-none-any.whl (10 kB)
+Installing collected packages: zipp, urllib3, six, pyglet, more-itertools, kiwisolver, fonttools, cycler, contourpy, charset_normalizer, requests, mujoco, matplotlib
+
+Successfully installed charset_normalizer-3.4.4 contourpy-1.3.2 cycler-0.12.1 fonttools-4.61.1 kiwisolver-1.4.9 matplotlib-3.10.8 more-itertools-10.8.0 mujoco-3.4.0 pyglet-2.1.12 requests-2.32.5 six-1.17.0 urllib3-2.6.3 zipp-3.23.0

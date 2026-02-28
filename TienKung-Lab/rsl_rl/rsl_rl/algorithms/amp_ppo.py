@@ -271,6 +271,7 @@ class AMPPPO:
                 rnd_state_batch,
             ) = sample
 
+
             # number of augmentations per sample
             # we start with 1 and increase it if we use symmetry augmentation
             num_aug = 1
@@ -421,6 +422,15 @@ class AMPPPO:
             # Discriminator loss.
             policy_state, policy_next_state = sample_amp_policy
             expert_state, expert_next_state = sample_amp_expert
+
+            ########--- 调试：专家 AMP 维度 vs 环境 AMP 维度 ---#######
+            if not hasattr(self, "_debug_printed_amp_batch"):
+                print(
+                    f"[DEBUG][AMP] policy_state.shape={policy_state.shape}, "
+                    f"expert_state.shape={expert_state.shape}"
+                )
+                self._debug_printed_amp_batch = True
+
             if self.amp_normalizer is not None:
                 with torch.no_grad():
                     policy_state = self.amp_normalizer.normalize_torch(policy_state, self.device)

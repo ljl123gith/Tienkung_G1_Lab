@@ -310,11 +310,12 @@ class G1DwaqEnv(VecEnv):
         feet_pos_translated = feet_pos_w - root_pos_w.unsqueeze(1)  # (num_envs, num_feet, 3)
         feet_vel_translated = feet_vel_w - root_vel_w.unsqueeze(1)  # (num_envs, num_feet, 3)
         
-        # Rotate to body frame using Isaac Lab's quat_apply_inverse
+        # Rotate to body frame using Isaac Lab's quat_rotate_inverse
+        # Note: quat_rotate_inverse was renamed to quat_rotate_inverse in Isaac Lab 0.38.0
         num_feet = feet_pos_translated.shape[1]
         for i in range(num_feet):
-            self.feet_pos_in_body[:, i, :] = math_utils.quat_apply_inverse(root_quat_w, feet_pos_translated[:, i, :])
-            self.feet_vel_in_body[:, i, :] = math_utils.quat_apply_inverse(root_quat_w, feet_vel_translated[:, i, :])
+            self.feet_pos_in_body[:, i, :] = math_utils.quat_rotate_inverse(root_quat_w, feet_pos_translated[:, i, :])
+            self.feet_vel_in_body[:, i, :] = math_utils.quat_rotate_inverse(root_quat_w, feet_vel_translated[:, i, :])
 
     def _get_current_critic_obs_with_height_scan(self):
         """
