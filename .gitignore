@@ -165,5 +165,4 @@ TienKung-Lab/logs/
 */logs/
 
 # 忽略数据集文件夹 (如果有)
-datasets/
-data/
+
