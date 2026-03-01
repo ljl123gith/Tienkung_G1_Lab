@@ -40,7 +40,7 @@ class G1RewardCfg(RewardCfg):
     track_lin_vel_xy_exp = RewTerm(func=mdp.track_lin_vel_xy_yaw_frame_exp, weight=1.0, params={"std": 0.5})
     track_ang_vel_z_exp = RewTerm(func=mdp.track_ang_vel_z_world_exp, weight=1.0, params={"std": 0.5})
     lin_vel_z_l2 = RewTerm(func=mdp.lin_vel_z_l2, weight=-1.0)
-    ang_vel_xy_l2 = RewTerm(func=mdp.ang_vel_xy_l2, weight=-0.05)
+    ang_vel_xy_l2 = RewTerm(func=mdp.ang_vel_xy_l2, weight=-0.25)
     energy = RewTerm(func=mdp.energy, weight=-1e-3)
     dof_acc_l2 = RewTerm(func=mdp.joint_acc_l2, weight=-2.5e-7)
     action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
@@ -57,7 +57,7 @@ class G1RewardCfg(RewardCfg):
     body_orientation_l2 = RewTerm(
         func=mdp.body_orientation_l2, params={"asset_cfg": SceneEntityCfg("robot", body_names=".*torso.*")}, weight=-2.0
     )
-    flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=-1.0)
+    flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=-10.0) 
     termination_penalty = RewTerm(func=mdp.is_terminated, weight=-200.0)
     feet_air_time = RewTerm(
         func=mdp.feet_air_time_positive_biped,
@@ -83,7 +83,7 @@ class G1RewardCfg(RewardCfg):
     )
     feet_too_near = RewTerm(
         func=mdp.feet_too_near_humanoid,
-        weight=-2.0,
+        weight=-4.0,
         params={"asset_cfg": SceneEntityCfg("robot", body_names=[".*ankle_roll.*"]), "threshold": 0.2},
     )
     feet_stumble = RewTerm(
@@ -123,29 +123,29 @@ class G1WalkGaitRewardCfg25(G1RewardCfg):
     设计完全参考 g1_walkamp_cfg.G1WalkAmpRewardCfg，只是名字改成 25 版。
     """
 
-    # # 步态周期性奖励：鼓励双脚在一个 gait 周期内接触力呈周期性变化
-    # gait_feet_frc_perio = RewTerm(
-    #     func=mdp.gait_feet_frc_perio,
-    #     weight=1.0,
-    #     params={"delta_t": 0.02},
-    # )
+    # 步态周期性奖励：鼓励双脚在一个 gait 周期内接触力呈周期性变化
+    gait_feet_frc_perio = RewTerm(
+        func=mdp.gait_feet_frc_perio,
+        weight=1,
+        params={"delta_t": 0.02},
+    )
 
-    # # 步态周期性奖励：鼓励双脚速度在步态周期内呈合理的摆动/支撑模式
-    # gait_feet_spd_perio = RewTerm(
-    #     func=mdp.gait_feet_spd_perio,
-    #     weight=1.0,
-    #     params={"delta_t": 0.02},
-    # )
+    # 步态周期性奖励：鼓励双脚速度在步态周期内呈合理的摆动/支撑模式
+    gait_feet_spd_perio = RewTerm(
+        func=mdp.gait_feet_spd_perio,
+        weight=1,
+        params={"delta_t": 0.02},
+    )
 
-    # # 支撑相的接触力周期性：鼓励在支撑相有稳定的支撑力
-    # gait_feet_frc_support_perio = RewTerm(
-    #     func=mdp.gait_feet_frc_support_perio,
-    #     weight=0.6,
-    #     params={"delta_t": 0.02},
-    # )
+    # 支撑相的接触力周期性：鼓励在支撑相有稳定的支撑力
+    gait_feet_frc_support_perio = RewTerm(
+        func=mdp.gait_feet_frc_support_perio,
+        weight=0.6,
+        params={"delta_t": 0.02},
+    )
 
-    # # 如有需要，可以像 g1_walkamp 一样微调已有项的权重，例如：
-    # # flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=-1.0)
+    # 如有需要，可以像 g1_walkamp 一样微调已有项的权重，例如：
+    # flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=-1.0)
 
 
 
@@ -206,7 +206,7 @@ class G1FlatEnvCfg_25(BaseEnvCfg):
         heading_control_stiffness=0.5,
         debug_vis=True,
         ranges=CommandRangesCfg(
-            lin_vel_x=(-0, 0.5), lin_vel_y=(-00, 0), ang_vel_z=(-0, 0), heading=(-math.pi, math.pi)
+            lin_vel_x=(-0, 1), lin_vel_y=(-00, 0), ang_vel_z=(-0, 0), heading=(-math.pi, math.pi)
         ),
     )
 
@@ -226,9 +226,9 @@ class G1FlatEnvCfg_25(BaseEnvCfg):
 class G1FlatAgentCfg_25(BaseAgentCfg):
     experiment_name: str = "g1_flat_25"
     wandb_project: str = "g1_flat_25"
-    resume = True
-    load_run = "2026-02-28_11-41-40"
-    load_checkpoint = "model_4700.pt"
+    resume = False
+    load_run = ".*"
+    load_checkpoint = "model_*.pt"
 
     
     def __post_init__(self):

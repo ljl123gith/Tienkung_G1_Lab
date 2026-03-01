@@ -498,7 +498,7 @@ def play():
     print("[INFO] 正在执行开局热身 (安全落地并填充历史缓冲区)...")
     # 执行 30 步 (大约 0.6 秒) 的零动作。
     # 在 IsaacLab 中，输入全 0 动作等于维持机器人默认的 Default Joint Position 站立姿态
-    for _ in range(60):
+    for _ in range(30):
         zero_actions = torch.zeros((env.num_envs, env.num_actions), device=env.device)
         obs, _, _, extras = env.step(zero_actions)
                 
