@@ -7,13 +7,13 @@
 [![Linux platform](https://img.shields.io/badge/platform-linux--64-orange.svg)](https://releases.ubuntu.com/22.04/)
 [![License](https://img.shields.io/badge/license-BSD--3-yellow.svg)](LICENSE)
 
-![2026-03-28_22-05](/home/ljl/ljl_for_RL/TienKung_G1_Lab/TienKung-Lab/2026-03-28_22-05.png)
+![2026-03-28_22-05](./TienKung-Lab/2026-03-28_22-05.png)
 
 项目简介
 
 本项目展示了基于深度强化学习的 **G1 25自由度人形机器人拟人风格化行走** 的算法框架
 
-![2026-03-28_22-08](/home/ljl/ljl_for_RL/TienKung_G1_Lab/TienKung-Lab/2026-03-28_22-08.png)
+![2026-03-28_22-08](./TienKung-Lab/2026-03-28_22-08.png)
 
 
 
