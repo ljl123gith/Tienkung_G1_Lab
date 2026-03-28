@@ -7,15 +7,15 @@
 [![Linux platform](https://img.shields.io/badge/platform-linux--64-orange.svg)](https://releases.ubuntu.com/22.04/)
 [![License](https://img.shields.io/badge/license-BSD--3-yellow.svg)](LICENSE)
 
-![2026-03-28_22-05](/home/ljl/My_Captures/2026-03-28_22-05.png)
+![2026-03-28_22-05](/home/ljl/ljl_for_RL/TienKung_G1_Lab/TienKung-Lab/2026-03-28_22-05.png)
 
-## 项目简介
+项目简介
 
 本项目展示了基于深度强化学习的 **G1 25自由度人形机器人拟人风格化行走** 的算法框架
 
+![2026-03-28_22-08](/home/ljl/ljl_for_RL/TienKung_G1_Lab/TienKung-Lab/2026-03-28_22-08.png)
 
 
-![2026-03-28_22-08](/home/ljl/My_Captures/2026-03-28_22-08.png)
 
 本项目基于论文的核心思想参照“HumanMimic: Learning Natural Locomotion and Transitions for Humanoid Robot via Wasserstein Adversarial Imitation”，具体内容包AMP的观察空间和改进辨别器算法。https://arxiv.org/abs/2309.14225
 
@@ -140,3 +140,5 @@ python legged_lab/scripts/train.py --task=g1_walkamp_25 --headless --num_envs=40
 - [x] 强化学习训练流程
 - [x] 简单的自适应步态行走
 - [ ] 速度范围还有待扩展。
+
+项目在https://github.com/liuyufei-nubot/G1DWAQ_Lab  基础上进行扩展开发。
