@@ -301,7 +301,7 @@ class TienKungWalkAgentCfg(RslRlOnPolicyRunnerCfg):
         activation="elu",
     )
     algorithm = RslRlPpoAlgorithmCfg(
-        class_name="AMPPPO",
+        class_name="AMPPPO_WGAN_GP",
         value_loss_coef=1.0,
         use_clipped_value_loss=True,
         clip_param=0.2,
@@ -320,7 +320,10 @@ class TienKungWalkAgentCfg(RslRlOnPolicyRunnerCfg):
     )
     clip_actions = None
     save_interval = 100
-    runner_class_name = "AmpOnPolicyRunner"
+    # `AMPPPO_WGAN_GP` is supported by `AmpOnPolicyRunner_25`.
+    # Using `AmpOnPolicyRunner` raises:
+    # ValueError: Training type not found for algorithm AMPPPO_WGAN_GP.
+    runner_class_name = "AmpOnPolicyRunner_25"
     experiment_name = "walk"
     run_name = ""
     logger = "tensorboard"
@@ -331,8 +334,10 @@ class TienKungWalkAgentCfg(RslRlOnPolicyRunnerCfg):
     load_checkpoint = "model_.*.pt"
 
     # amp parameter
-    amp_reward_coef = 0.3
-    amp_motion_files = ["legged_lab/envs/tienkung/datasets/motion_amp_expert/walk.txt"]
+    amp_reward_coef = 0.5  # 0.3
+    amp_motion_files = [
+        "legged_lab/envs/tienkung/datasets/motion_amp_expert/walk.txt",
+    ]
     amp_num_preload_transitions = 200000
     amp_task_reward_lerp = 0.7
     amp_discr_hidden_dims = [1024, 512, 256]

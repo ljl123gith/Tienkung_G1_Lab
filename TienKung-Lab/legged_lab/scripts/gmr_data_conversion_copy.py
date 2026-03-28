@@ -3,6 +3,7 @@ import json
 import numpy as np
 import argparse
 from scipy.spatial.transform import Rotation
+from scipy.io import savemat
 
 """
 使用方法：
@@ -14,6 +15,7 @@ python gmr_data_conversion_copy.py \
 --input_pkl: 输入的 pkl 文件路径
 --output_txt: 输出的 txt 文件路径
 --fps: 帧率
+--fps 30.0 --format 64d
 
 示例：
 python gmr_data_conversion_copy.py \
@@ -140,7 +142,13 @@ def convert_76d_to_64d(data_76d, joint_order='urdf'):
     return data_64d
 
 
-def convert_pkl_to_custom(input_pkl, output_txt, fps, output_format='full'):
+def convert_pkl_to_custom(
+    input_pkl,
+    output_txt,
+    fps,
+    output_format='full',
+    output_mat=None,
+):
     dt = 1.0 / fps
 
     # 加载数据
@@ -344,29 +352,47 @@ def convert_pkl_to_custom(input_pkl, output_txt, fps, output_format='full'):
     else:
         print("   ✅ 格式: 76维（完整数据，包含末端位置）")
 
-    np.savetxt(output_txt, data_output, fmt='%f', delimiter=', ')
-    with open(output_txt, 'r') as f:
-        frames_data = f.readlines()
+    # 如果指定了 txt 路径，则保存 txt（原有逻辑）
+    if output_txt is not None:
+        np.savetxt(output_txt, data_output, fmt='%f', delimiter=', ')
+        with open(output_txt, 'r') as f:
+            frames_data = f.readlines()
 
-    frames_data_len = len(frames_data)
-    with open(output_txt, 'w') as f:
-        f.write('{\n')
-        f.write('"LoopMode": "Wrap",\n')
-        f.write(f'"FrameDuration": {1.0/fps:.3f},\n')
-        f.write('"EnableCycleOffsetPosition": true,\n')
-        f.write('"EnableCycleOffsetRotation": true,\n')
-        f.write('"MotionWeight": 0.5,\n\n')
-        f.write('"Frames":\n[\n')
+        frames_data_len = len(frames_data)
+        with open(output_txt, 'w') as f:
+            f.write('{\n')
+            f.write('"LoopMode": "Wrap",\n')
+            f.write(f'"FrameDuration": {1.0/fps:.3f},\n')
+            f.write('"EnableCycleOffsetPosition": true,\n')
+            f.write('"EnableCycleOffsetRotation": true,\n')
+            f.write('"MotionWeight": 0.5,\n\n')
+            f.write('"Frames":\n[\n')
 
-        for i, line in enumerate(frames_data):
-            line_start_str = '  ['
-            if i == frames_data_len - 1:
-                f.write(line_start_str + line.rstrip() + ']\n')
-            else:
-                f.write(line_start_str + line.rstrip() + '],\n')
+            for i, line in enumerate(frames_data):
+                line_start_str = '  ['
+                if i == frames_data_len - 1:
+                    f.write(line_start_str + line.rstrip() + ']\n')
+                else:
+                    f.write(line_start_str + line.rstrip() + '],\n')
 
-        f.write(']\n}')
-    print(f"✅ Successfully converted {input_pkl} to {output_txt}")
+            f.write(']\n}')
+        print(f"✅ Successfully converted {input_pkl} to {output_txt}")
+
+    # 如果需要，保存为 .mat 文件，方便在 MATLAB 中使用
+    if output_mat is not None:
+        mat_dict = {
+            "data": data_output,          # 主数据，形状为 (N, D)
+            "fps": float(fps),
+            "frameDuration": float(1.0 / fps),
+            "format": output_format,
+        }
+        try:
+            savemat(output_mat, mat_dict)
+            print(f"✅ 已保存 MAT 文件: {output_mat}")
+        except Exception as e:
+            print(f"⚠️ 保存 MAT 文件失败: {e}")
+
+    # （原 txt 写入逻辑已移入上方的条件分支中）
 
 
 if __name__ == "__main__":
@@ -397,7 +423,16 @@ if __name__ == "__main__":
         "--input_pkl", type=str, required=True, help="输入 pkl 文件路径"
     )
     parser.add_argument(
-        "--output_txt", type=str, required=True, help="输出 txt 文件路径"
+        "--output_txt",
+        type=str,
+        default=None,
+        help="可选：输出 txt 文件路径（JSON-like，原有格式）",
+    )
+    parser.add_argument(
+        "--output_mat",
+        type=str,
+        default=None,
+        help="可选：输出 MAT 文件路径（用于 MATLAB）",
     )
     parser.add_argument("--fps", type=float, default=30.0, help="帧率")
     parser.add_argument(
@@ -417,4 +452,5 @@ if __name__ == "__main__":
         args.output_txt,
         args.fps,
         args.format,
+        args.output_mat,
     )

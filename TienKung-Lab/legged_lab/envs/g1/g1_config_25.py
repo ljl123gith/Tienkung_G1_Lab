@@ -37,7 +37,7 @@ from legged_lab.terrains import GRAVEL_TERRAINS_CFG, ROUGH_TERRAINS_CFG
 
 @configclass
 class G1RewardCfg(RewardCfg):
-    track_lin_vel_xy_exp = RewTerm(func=mdp.track_lin_vel_xy_yaw_frame_exp, weight=1.0, params={"std": 0.5})
+    track_lin_vel_xy_exp = RewTerm(func=mdp.track_lin_vel_xy_yaw_frame_exp, weight=2.0, params={"std": 0.5})
     track_ang_vel_z_exp = RewTerm(func=mdp.track_ang_vel_z_world_exp, weight=1.0, params={"std": 0.5})
     lin_vel_z_l2 = RewTerm(func=mdp.lin_vel_z_l2, weight=-1.0)
     ang_vel_xy_l2 = RewTerm(func=mdp.ang_vel_xy_l2, weight=-0.25)
@@ -61,7 +61,7 @@ class G1RewardCfg(RewardCfg):
     termination_penalty = RewTerm(func=mdp.is_terminated, weight=-200.0)
     feet_air_time = RewTerm(
         func=mdp.feet_air_time_positive_biped,
-        weight=0.15,
+        weight=0.5, # 0.15
         params={"sensor_cfg": SceneEntityCfg("contact_sensor", body_names=".*ankle_roll.*"), "threshold": 0.4},
     )
     feet_slide = RewTerm(
@@ -133,7 +133,7 @@ class G1WalkGaitRewardCfg25(G1RewardCfg):
     # 步态周期性奖励：鼓励双脚速度在步态周期内呈合理的摆动/支撑模式
     gait_feet_spd_perio = RewTerm(
         func=mdp.gait_feet_spd_perio,
-        weight=1,
+        weight=0.25, # 1
         params={"delta_t": 0.02},
     )
 

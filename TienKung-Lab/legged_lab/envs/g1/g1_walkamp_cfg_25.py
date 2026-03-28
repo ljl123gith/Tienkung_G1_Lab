@@ -1,4 +1,6 @@
 from __future__ import annotations
+import math
+from legged_lab.envs.base.base_env_config import CommandsCfg, CommandRangesCfg
 
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
@@ -26,16 +28,17 @@ class G1WalkAmpRewardCfg_25(G1WalkGaitRewardCfg25):
     # However, user said "combine g1_flat rewards ... with walk task rewards"
     # So we keep G1RewardCfg base and add/override.
     
-    # Gait phase rewards from TienKung
-    gait_feet_frc_perio = RewTerm(func=mdp.gait_feet_frc_perio, weight=1.0, params={"delta_t": 0.02})
-    gait_feet_spd_perio = RewTerm(func=mdp.gait_feet_spd_perio, weight=1.0, params={"delta_t": 0.02})
-    gait_feet_frc_support_perio = RewTerm(func=mdp.gait_feet_frc_support_perio, weight=0.6, params={"delta_t": 0.02})
+    # # Gait phase rewards from TienKung
+    # gait_feet_frc_perio = RewTerm(func=mdp.gait_feet_frc_perio, weight=1.0, params={"delta_t": 0.02})
+    # gait_feet_spd_perio = RewTerm(func=mdp.gait_feet_spd_perio, weight=1.0, params={"delta_t": 0.02})
+    # gait_feet_frc_support_perio = RewTerm(func=mdp.gait_feet_frc_support_perio, weight=0.6, params={"delta_t": 0.02})
     
-    # Adjust weights for specific terms if needed, e.g.
-    flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=-1.0)
+    # # Adjust weights for specific terms if needed, e.g.
+    # flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=-1.0)
     
     # TienKung has these, G1RewardCfg might have similar or different.
     # We will trust G1RewardCfg for the basics and just add the gait ones.
+    pass
 
 
 @configclass
@@ -46,9 +49,9 @@ class G1WalkAmpEnvCfg_25(G1FlatEnvCfg_25):
     gait = GaitCfg()
 
     motion_visualization_files: list[str] = [
-        "legged_lab/envs/g1/datasets_ljl/motion_visualization/walk_0206_11_80_630_fixed_0227.txt",
-        "legged_lab/envs/g1/datasets_ljl/motion_visualization/walk_0206_11_730_970_left_fixed_0227.txt",
-        "legged_lab/envs/g1/datasets_ljl/motion_visualization/walk_0206_11_2640_2950_right_fixed_0227.txt",
+        "legged_lab/envs/g1/datasets_ljl/motion_visualization/walk_0206_11_80_630_fixed_0227 copy.txt",
+        # "legged_lab/envs/g1/datasets_ljl/motion_visualization/walk_0206_11_730_970_left_fixed_0227.txt",
+        # "legged_lab/envs/g1/datasets_ljl/motion_visualization/walk_0206_11_2640_2950_right_fixed_0227.txt",
     ]
     motion_visualization_index: int = 0
     motion_frame_duration: float = 0.033
@@ -65,6 +68,19 @@ class G1WalkAmpEnvCfg_25(G1FlatEnvCfg_25):
         
     #     # Ensure domain randomization for flat terrain matches expectations
     #     # (Inherited from G1FlatEnvCfg)
+    commands: CommandsCfg = CommandsCfg(
+        resampling_time_range=(10.0, 10.0),
+        rel_standing_envs=0.00,
+        rel_heading_envs=1.0,
+        heading_command=True,
+        heading_control_stiffness=0.5,
+        debug_vis=True,
+        ranges=CommandRangesCfg(
+            lin_vel_x=(0.01, 1.5), lin_vel_y=(-00, 0), ang_vel_z=(-0, 0), heading=(-math.pi, math.pi)
+        ),
+    )
+
+
 
     def __post_init__(self):
         super().__post_init__()
@@ -95,11 +111,11 @@ class G1WalkAmpAgentCfg_25(BaseAgentCfg):
         activation="elu",
     )
     algorithm = RslRlPpoAlgorithmCfg(
-        class_name="AMPPPO",
+        class_name="AMPPPO_WGAN_GP",  #AMPPPO_WGAN_GP
         value_loss_coef=1.0,
         use_clipped_value_loss=True,
         clip_param=0.2,
-        entropy_coef=0.005,
+        entropy_coef=0.01, #0.005（0309） 0.05 （0310）
         num_learning_epochs=5,
         num_mini_batches=4,
         learning_rate=1.0e-3,
@@ -112,27 +128,31 @@ class G1WalkAmpAgentCfg_25(BaseAgentCfg):
         symmetry_cfg=None,
         rnd_cfg=None,
     )
-    resume = True
+    resume = False
     # load_run = ".*" 2026-02-27_16-58-00
-    load_run = "2026-02-27_16-58-00" 
-    load_checkpoint = "model_4900.pt"
+    load_run = ".*" 
+    load_checkpoint = "model_*.pt"
 
 
     # AMP parameters
-    amp_reward_coef = 5
+    # HumanMimic soft-boundary coefficient (larger -> stronger compression of D(x) range).
+    # NOTE: This is injected into the algorithm by the AMP runner because IsaacLab's
+    # `RslRlPpoAlgorithmCfg` schema does not include `eta`.
+    amp_eta = 0.5
+    amp_reward_coef = 1  # 5 1 0.1  0.2 5
     amp_motion_files = [
-        # "legged_lab/envs/g1/datasets/motion_visualization/walk_0131_100_1000.txt"
-        "legged_lab/envs/g1/datasets_ljl/motion_visualization/walk_0206_11_80_630_fixed_0227.txt",
-        "legged_lab/envs/g1/datasets_ljl/motion_visualization/walk_0206_11_730_970_left_fixed_0227.txt",
-        "legged_lab/envs/g1/datasets_ljl/motion_visualization/walk_0206_11_2640_2950_right_fixed_0227.txt",
+        # "legged_lab/envs/g1/datasets/motion_visualization/walk_0131_100_1000.txt"walk_0206_11_80_630_fixed_0227 copy.txt
+        "legged_lab/envs/g1/datasets_ljl/motion_visualization/walk_0206_11_80_630_fixed_0227 copy.txt",
+        # "legged_lab/envs/g1/datasets_ljl/motion_visualization/walk_0206_11_730_970_left_fixed_0227.txt",
+        # "legged_lab/envs/g1/datasets_ljl/motion_visualization/walk_0206_11_2640_2950_right_fixed_0227.txt",
     ]
     amp_motion_weights = {
         # "walk_0131_100_1000": 1.0,
-        "walk_0206_11_80_630_fixed_0227": 1.0,
-        "walk_0206_11_730_970_left_fixed_0227": 0.5,
-        "walk_0206_11_2640_2950_right_fixed_0227": 0.5,
+        "walk_0206_11_80_630_fixed_0227 copy": 1.0,
+        # "walk_0206_11_730_970_left_fixed_0227": 0,
+        # "walk_0206_11_2640_2950_right_fixed_0227":0,
     }
     amp_num_preload_transitions = 200000
-    amp_task_reward_lerp = 0.7
+    amp_task_reward_lerp = 0.4 #    0.7  0.5 （0309）
     amp_discr_hidden_dims = [1024, 512, 256]
     min_normalized_std = [0.05] * 25

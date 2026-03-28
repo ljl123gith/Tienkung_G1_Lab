@@ -134,7 +134,7 @@ H1_CFG = ArticulationCfg(
     },
 )
 
-
+#/home/ljl/ljl_for_RL/G1DWAQ_Lab/TienKung-Lab/legged_lab/assets/unitree/g1/mjcf/g1_29dof.urdf
 G1_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
         usd_path=f"{ISAAC_ASSET_DIR}/unitree/g1/g1.usd",
@@ -149,7 +149,7 @@ G1_CFG = ArticulationCfg(
             max_depenetration_velocity=1.0,
         ),
         articulation_props=sim_utils.ArticulationRootPropertiesCfg(
-            enabled_self_collisions=True, solver_position_iteration_count=4, solver_velocity_iteration_count=4
+            enabled_self_collisions=False, solver_position_iteration_count=4, solver_velocity_iteration_count=4
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(

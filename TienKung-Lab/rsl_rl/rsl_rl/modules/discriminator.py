@@ -114,6 +114,9 @@ class Discriminator(nn.Module):
                 - reward (torch.Tensor): Predicted AMP reward (optionally interpolated) with shape (batch_size,).
                 - d (torch.Tensor): Raw discriminator output logits with shape (batch_size, 1).
         """
+        # AMP reward inference should run with deterministic layers disabled (eval mode).
+        # Do NOT force `.train()` here; the caller (runner/algorithm) controls the mode.
+        was_training = self.training
         with torch.no_grad():
             self.eval()
             if normalizer is not None:
@@ -124,6 +127,8 @@ class Discriminator(nn.Module):
             reward = self.amp_reward_coef * torch.clamp(1 - (1 / 4) * torch.square(d - 1), min=0)
             if self.task_reward_lerp > 0:
                 reward = self._lerp_reward(reward, task_reward.unsqueeze(-1))
+
+        if was_training:
             self.train()
         return reward.squeeze(), d
 
@@ -140,6 +145,18 @@ class Discriminator(nn.Module):
         """
         r = (1.0 - self.task_reward_lerp) * disc_r + self.task_reward_lerp * task_r
         return r
+
+
+def get_ankle_remove_indices(obs_dim: int):
+    """根据 AMP 观测维度返回需要移除的 ankle 关节索引。
+
+    - 52 维: 20DoF 旧格式
+    - 64 维: 25DoF GMR 格式
+    其他维度: 不移除任何索引
+    """
+    # 这里目前返回空集，相当于不做任何裁剪。
+    # 如果后续你想像原 HumanMimic 一样去掉 ankle 相关维度，可以把 amp_ppo_WGAN_GP.py 里的实现拷过来。
+    return torch.tensor([], dtype=torch.long, device="cpu")
 
 
 
@@ -162,7 +179,6 @@ class Discriminator_WGAN_GP(nn.Module):
           #  amp_layers.append(nn.Linear(curr_in_dim, hidden_dim))
            # amp_layers.append(nn.ReLU())
             amp_layers.append(nn.Linear(curr_in_dim, hidden_dim))
-            amp_layers.append(nn.Dropout(0.5))
             amp_layers.append(nn.ELU())
             curr_in_dim = hidden_dim
         self.trunk = nn.Sequential(*amp_layers).to(device)
@@ -257,6 +273,9 @@ class Discriminator_WGAN_GP(nn.Module):
          预测 AMP 奖励。
         HumanMimic 使用指数奖励 exp(d)。
         """
+        # AMP reward inference should run with deterministic layers disabled (eval mode).
+        # Do NOT force `.train()` here; the caller (runner/algorithm) controls the mode.
+        was_training = self.training
         with torch.no_grad():
             self.eval()
             # 移除特定索引以匹配归一化器的维度（与Discriminator_baseline保持一致）
@@ -292,8 +311,9 @@ class Discriminator_WGAN_GP(nn.Module):
 
             if self.task_reward_lerp > 0:
                 reward = self._lerp_reward(reward, task_reward.unsqueeze(-1))
+
+        if was_training:
             self.train()
-            
         return reward.squeeze(), d
 
     def _lerp_reward(self, disc_r, task_r):

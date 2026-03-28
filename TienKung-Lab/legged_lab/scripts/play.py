@@ -68,6 +68,32 @@ parser.add_argument("--terrain_color", type=str, default="mdl_shingles",
 parser.add_argument("--no_gait", action="store_true",
                     help="Disable gait phase mechanism (for testing models trained without gait)")
 
+# Save root-velocity tracking traces for plotting (paper figures).
+parser.add_argument(
+    "--save_trace",
+    action="store_true",
+    help="Save command vs root (base) velocity/pose traces to disk for plotting.",
+)
+parser.add_argument(
+    "--trace_max_time",
+    type=float,
+    default=None,
+    help="If set (in seconds), stop play after this simulated time and save trace.",
+)
+parser.add_argument(
+    "--trace_format",
+    type=str,
+    default="csv",
+    choices=["csv", "npz"],
+    help="Trace file format to save: csv or npz.",
+)
+parser.add_argument(
+    "--trace_name",
+    type=str,
+    default=None,
+    help="Optional trace file name prefix. Default: <task>_<checkpoint_stem>.",
+)
+
 # Optional: override velocity commands at play-time.
 # If you don't pass these, we keep whatever is defined in the task config (same as training),
 # which is usually the safest way to evaluate a trained policy.
@@ -100,6 +126,12 @@ cli_args.add_rsl_rl_args(parser)
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 args_cli, hydra_args = parser.parse_known_args()
+
+# Debug: 检查 task 参数是否被正确解析
+if hasattr(args_cli, 'task'):
+    print(f"[DEBUG] args_cli.task = {args_cli.task}")
+else:
+    print("[DEBUG] args_cli 没有 'task' 属性")
 # Start camera rendering for tasks that require RGB/depth sensing
 if args_cli.task and ("sensor" in args_cli.task or "rgb" in args_cli.task or "depth" in args_cli.task):
     args_cli.enable_cameras = True
@@ -122,6 +154,13 @@ def play():
     env_cfg: BaseEnvCfg  # noqa:F405
 
     env_class_name = args_cli.task
+    if env_class_name is None:
+        raise ValueError(
+            "❌ 错误: 必须提供 --task 参数！\n"
+            "使用方法: python play.py --task <task_name> [其他参数...]\n"
+            "示例: python play.py --task g1_walkamp_25 --load_run <run_name> --checkpoint <checkpoint>\n"
+            "注意: 使用空格分隔参数，例如 --task g1_walkamp_25（不要用等号）"
+        )
     env_cfg, agent_cfg = task_registry.get_cfgs(env_class_name)
 
     env_cfg.noise.add_noise = False
@@ -370,6 +409,8 @@ def play():
     print(f"[INFO] Loading experiment from directory: {log_root_path}")
     resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
     log_dir = os.path.dirname(resume_path)
+    trace_dir = os.path.join(log_dir, "play_traces")
+    os.makedirs(trace_dir, exist_ok=True)
 
     runner_name = agent_cfg.runner_class_name
     runner_class = RUNNER_CLASS_MAP.get(runner_name, None)
@@ -498,7 +539,7 @@ def play():
     print("[INFO] 正在执行开局热身 (安全落地并填充历史缓冲区)...")
     # 执行 30 步 (大约 0.6 秒) 的零动作。
     # 在 IsaacLab 中，输入全 0 动作等于维持机器人默认的 Default Joint Position 站立姿态
-    for _ in range(30):
+    for _ in range(15):
         zero_actions = torch.zeros((env.num_envs, env.num_actions), device=env.device)
         obs, _, _, extras = env.step(zero_actions)
                 
@@ -516,6 +557,42 @@ def play():
     cmd_vx_hist: list[float] = []
     root_vx_hist: list[float] = []
     root_x_hist: list[float] = []
+
+    # ------------------------------------------------------------------
+    # Save trace buffers for paper plotting
+    # ------------------------------------------------------------------
+    trace_rows: list[dict] = []
+    step_i = 0
+
+    def _get_default_trace_name() -> str:
+        # e.g., task=g1_dwaq, checkpoint=model_9400.pt -> g1_dwaq_model_9400
+        ckpt_stem = os.path.splitext(os.path.basename(resume_path))[0]
+        return f"{env_class_name}_{ckpt_stem}"
+
+    def _save_trace_to_disk():
+        if not args_cli.save_trace:
+            return
+        if len(trace_rows) == 0:
+            print("[WARN] --save_trace enabled but no samples were collected.")
+            return
+        name = args_cli.trace_name or _get_default_trace_name()
+        if args_cli.trace_format == "csv":
+            import csv
+
+            out_path = os.path.join(trace_dir, f"{name}.csv")
+            fieldnames = list(trace_rows[0].keys())
+            with open(out_path, "w", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(trace_rows)
+            print(f"[INFO] Saved trace CSV: {out_path}")
+        else:
+            out_path = os.path.join(trace_dir, f"{name}.npz")
+            # Convert list[dict] -> dict[str, np.ndarray]
+            keys = list(trace_rows[0].keys())
+            data = {k: np.asarray([r[k] for r in trace_rows]) for k in keys}
+            np.savez_compressed(out_path, **data)
+            print(f"[INFO] Saved trace NPZ: {out_path}")
 
     def update_debug_plot():
         """在独立窗口中画出 cmd_vx 与 root_vx 的对比曲线，并显示 root_x。"""
@@ -576,39 +653,114 @@ def play():
         cv2.imshow("Cmd vs Root Velocity", img)
         cv2.waitKey(1)
 
-    while simulation_app.is_running():
+    try:
+        while simulation_app.is_running():
 
-        with torch.inference_mode():
-            # DWAQ policy needs extras for obs_hist
-            if use_dwaq_policy:
-                actions = policy(obs, extras)
-            else:
-                actions = policy(obs)
-            
-            # All envs now return (obs, rewards, dones, extras) - Isaac Lab convention
-            obs, _, dones, extras = env.step(actions)
+            with torch.inference_mode():
+                # DWAQ policy needs extras for obs_hist
+                if use_dwaq_policy:
+                    actions = policy(obs, extras)
+                else:
+                    actions = policy(obs)
 
-            # ----- Debug: 记录并可视化 root 速度/位置 与 命令速度 -----
-            try:
-                # env.command_generator.command: [vx, vy, wz, ...]
-                cmd = env.command_generator.command[0].detach().cpu().numpy()
-                root_vel = env.robot.data.root_lin_vel_b[0].detach().cpu().numpy()
-                root_pos = env.robot.data.root_pos_w[0].detach().cpu().numpy()
+                # All envs now return (obs, rewards, dones, extras) - Isaac Lab convention
+                obs, _, dones, extras = env.step(actions)
 
-                cmd_vx_hist.append(float(cmd[0]))
-                root_vx_hist.append(float(root_vel[0]))
-                root_x_hist.append(float(root_pos[0]))
+                # ============================================================
+                #  论文用：按时间 t 定义分段速度命令 (vx, vy, wz)
+                #  例如：0–2s: 0 m/s, 2–4s: 0.2 m/s, 4–6s: -0.2 m/s, >6s: 0.0
+                # ============================================================
+                step_dt_cmd = float(getattr(env, "step_dt", 0.0))
+                t_cmd = float(step_i * step_dt_cmd)
+                vx_cmd, vy_cmd, wz_cmd = 0.0, 0.0, 0.0
+                # if 2.0 <= t_cmd < 4.0:
+                #     vx_cmd = 0.4
+                # elif 4.0 <= t_cmd < 7.0:
+                #     vx_cmd = 0.8
+                #     vy_cmd = 0.4
+                # elif 6.0 <= t_cmd < 8.0:
+                #     vy_cmd = 0.2
+                #     vx_cmd = 0.2
+                # elif 8.0 <= t_cmd < 10.0:
+                #     wz_cmd = 0
+                # elif 10.0 <= t_cmd < 11.0:
+                #     wz_cmd = -00
+                
+                if 2.0 <= t_cmd < 4.0:
+                    vx_cmd = 0.4
+                elif 4.0 <= t_cmd < 6.0:
+                    vx_cmd = 0.6
+                    vy_cmd = 0 
+                elif 6.0 <= t_cmd < 8.0:
+                    vy_cmd = 0
+                    vx_cmd = 1
+                elif 8.0 <= t_cmd < 10.0:
+                    wz_cmd = 0
+                    vx_cmd = 1.5
+                elif 10.0 <= t_cmd < 11.0:
+                    wz_cmd = -00
+                    vx_cmd = 1.5
+                
+                # 其它时间段 vx_cmd 维持 0.0（可按需要自行扩展）
+                with torch.no_grad():
+                    env.command_generator.command[0, 0] = vx_cmd
+                    if env.command_generator.command.shape[1] > 1:
+                        env.command_generator.command[0, 1] = vy_cmd
+                    if env.command_generator.command.shape[1] > 2:
+                        env.command_generator.command[0, 2] = wz_cmd
 
-                # 限制历史长度
-                if len(cmd_vx_hist) > max_history:
-                    cmd_vx_hist.pop(0)
-                    root_vx_hist.pop(0)
-                    root_x_hist.pop(0)
+                # ----- Debug: 记录并可视化 root 速度 与 命令速度 -----
+                try:
+                    # env.command_generator.command: [vx, vy, wz, ...]
+                    cmd = env.command_generator.command[0].detach().cpu().numpy()
+                    root_vel = env.robot.data.root_lin_vel_b[0].detach().cpu().numpy()
+                    root_ang = None
+                    if hasattr(env.robot.data, "root_ang_vel_b"):
+                        root_ang = env.robot.data.root_ang_vel_b[0].detach().cpu().numpy()
+                    root_pos = env.robot.data.root_pos_w[0].detach().cpu().numpy()
 
-                update_debug_plot()
-            except Exception:
-                # 如果某些任务结构不同（没有 command_generator 或 root_vel），静默忽略
-                pass
+                    cmd_vx_hist.append(float(cmd[0]))
+                    root_vx_hist.append(float(root_vel[0]))
+                    root_x_hist.append(float(root_pos[0]))
+
+                    # Save trace for plotting
+                    step_dt = float(getattr(env, "step_dt", 0.0))
+                    t = float(step_i * step_dt)
+                    # 仅为论文绘图保存指令与根节点速度（不保存位置）。
+                    # cmd_v*: 期望机体在水平面的线速度；root_v*: 实际机体在 body frame 下的线速度；
+                    # root_wz: 机体在 body frame 下的 yaw 角速度。
+                    row = {
+                        "step": int(step_i),
+                        "t": t,
+                        "cmd_vx": float(cmd[0]),
+                        "cmd_vy": float(cmd[1]) if cmd.shape[0] > 1 else 0.0,
+                        "cmd_wz": float(cmd[2]) if cmd.shape[0] > 2 else 0.0,
+                        "root_vx": float(root_vel[0]),
+                        "root_vy": float(root_vel[1]) if root_vel.shape[0] > 1 else 0.0,
+                    }
+                    if root_ang is not None and root_ang.shape[0] > 2:
+                        row["root_wz"] = float(root_ang[2])
+                    else:
+                        row["root_wz"] = 0.0
+                    trace_rows.append(row)
+                    step_i += 1
+
+                    # 如果指定了 trace_max_time，到达后自动结束循环并保存数据
+                    if args_cli.trace_max_time is not None and t >= args_cli.trace_max_time:
+                        print(f"[INFO] Reached trace_max_time={args_cli.trace_max_time:.2f}s, stopping play loop.")
+                        # 触发外层 finally 保存并退出
+                        raise KeyboardInterrupt
+
+                    # 限制历史长度
+                    if len(cmd_vx_hist) > max_history:
+                        cmd_vx_hist.pop(0)
+                        root_vx_hist.pop(0)
+                        root_x_hist.pop(0)
+
+                    update_debug_plot()
+                except Exception:
+                    # 如果某些任务结构不同（没有 command_generator 或 root_vel），静默忽略
+                    pass
             
             # Reset history for terminated environments
             if use_depth_policy:
@@ -619,27 +771,30 @@ def play():
    
 
 
-            # Display RGB image in real-time using cv2.imshow
-            if hasattr(env, 'rgb_camera') and env.rgb_camera is not None:
-                try:
-                    rgb_raw = env.rgb_camera.data.output["rgb"]
-                    lookat_id = getattr(env, 'lookat_id', 0)
-                    rgb_img = rgb_raw[lookat_id].cpu().numpy()
-                    # Ensure uint8 format
-                    if rgb_img.dtype != 'uint8':
-                        rgb_img = (rgb_img * 255).clip(0, 255).astype('uint8')
-                    # Remove alpha channel if present
-                    if rgb_img.shape[-1] == 4:
-                        rgb_img = rgb_img[..., :3]
-                    # Convert RGB to BGR for OpenCV
-                    rgb_img_bgr = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2BGR)
-                    # Resize for better visibility
-                    rgb_img_resized = cv2.resize(rgb_img_bgr, (256, 256), interpolation=cv2.INTER_LINEAR)
-                    # Display in window
-                    cv2.imshow("RGB Camera View", rgb_img_resized)
-                    cv2.waitKey(1)  # Required for window to update
-                except Exception:
-                    pass  # Silently ignore errors
+                # Display RGB image in real-time using cv2.imshow
+                if hasattr(env, 'rgb_camera') and env.rgb_camera is not None:
+                    try:
+                        rgb_raw = env.rgb_camera.data.output["rgb"]
+                        lookat_id = getattr(env, 'lookat_id', 0)
+                        rgb_img = rgb_raw[lookat_id].cpu().numpy()
+                        # Ensure uint8 format
+                        if rgb_img.dtype != 'uint8':
+                            rgb_img = (rgb_img * 255).clip(0, 255).astype('uint8')
+                        # Remove alpha channel if present
+                        if rgb_img.shape[-1] == 4:
+                            rgb_img = rgb_img[..., :3]
+                        # Convert RGB to BGR for OpenCV
+                        rgb_img_bgr = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2BGR)
+                        # Resize for better visibility
+                        rgb_img_resized = cv2.resize(rgb_img_bgr, (256, 256), interpolation=cv2.INTER_LINEAR)
+                        # Display in window
+                        cv2.imshow("RGB Camera View", rgb_img_resized)
+                        cv2.waitKey(1)  # Required for window to update
+                    except Exception:
+                        pass  # Silently ignore errors
+    finally:
+        # Ensure we always flush traces on exit (including Ctrl+C).
+        _save_trace_to_disk()
 
 
 if __name__ == "__main__":

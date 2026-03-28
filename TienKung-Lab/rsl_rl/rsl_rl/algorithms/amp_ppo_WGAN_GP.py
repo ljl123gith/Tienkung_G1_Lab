@@ -144,13 +144,16 @@ class AMPPPO_Pairwise:
         # PPO components
         self.policy = policy
         self.policy.to(self.device)
+        policy_lr = learning_rate
+        amp_lr = 0.8 * learning_rate  # 判别器学习率更小（你可以用 0.3、0.1 自己调）
+
         # Create optimizer
         params = [
-            {"params": self.policy.parameters(), "name": "policy"},
-            {"params": self.discriminator.trunk.parameters(), "weight_decay": 10e-4, "name": "amp_trunk"},
-            {"params": self.discriminator.amp_linear.parameters(), "weight_decay": 10e-2, "name": "amp_head"},
+            {"params": self.policy.parameters(),"lr": policy_lr, "name": "policy"},
+            {"params": self.discriminator.trunk.parameters(),"lr": amp_lr,"weight_decay": 10e-4, "name": "amp_trunk"},
+            {"params": self.discriminator.amp_linear.parameters(),"lr": amp_lr,"weight_decay": 10e-2, "name": "amp_head"},
         ]
-        self.optimizer = optim.Adam(params, lr=learning_rate)
+        self.optimizer = optim.Adam(params,)
         # Create rollout storage
         self.storage: RolloutStorage = None  # type: ignore
         self.transition = RolloutStorage.Transition()
@@ -488,7 +491,7 @@ class AMPPPO_Pairwise:
             grad_pen_loss = self.discriminator.compute_grad_pen(
                 expert_state, expert_next_state, 
                 policy_state, policy_next_state, 
-                lambda_=10)
+                lambda_=20 ) #10 (0309)
             loss += self.amploss_coef * amp_loss + self.amploss_coef * grad_pen_loss
 
             # Compute the gradients

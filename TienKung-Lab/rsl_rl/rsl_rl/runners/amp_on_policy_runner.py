@@ -64,6 +64,13 @@ class AmpOnPolicyRunner:
         else:
             raise ValueError(f"Training type not found for algorithm {self.alg_cfg['class_name']}.")
 
+        # Inject HumanMimic soft-boundary coefficient for WGAN-GP AMP, if provided by config.
+        # We keep this in runner because IsaacLab's `RslRlPpoAlgorithmCfg` schema doesn't include `eta`.
+        if self.alg_cfg.get("class_name") == "AMPPPO_WGAN_GP" and "eta" not in self.alg_cfg:
+            amp_eta = self.cfg.get("amp_eta", None)
+            if amp_eta is not None:
+                self.alg_cfg["eta"] = amp_eta
+
         # resolve dimensions of observations
         obs, extras = self.env.get_observations()
         num_obs = obs.shape[1]
@@ -243,6 +250,8 @@ class AmpOnPolicyRunner:
         for it in range(start_iter, tot_iter):
             start = time.time()
             # Rollout
+            # AMP reward inference should be deterministic (disable Dropout/BatchNorm).
+            self.alg.discriminator.eval()
             with torch.inference_mode():
                 for _ in range(self.num_steps_per_env):
                     # Sample actions
@@ -318,6 +327,8 @@ class AmpOnPolicyRunner:
                 if self.training_type == "rl":
                     self.alg.compute_returns(privileged_obs)
 
+            # Switch back to training mode for discriminator/policy updates.
+            self.alg.discriminator.train()
             # update policy
             loss_dict = self.alg.update()
 
@@ -624,6 +635,13 @@ class AmpOnPolicyRunner_25:
         else:
             raise ValueError(f"Training type not found for algorithm {self.alg_cfg['class_name']}.")
 
+        # Inject HumanMimic soft-boundary coefficient for WGAN-GP AMP, if provided by config.
+        # We keep this in runner because IsaacLab's `RslRlPpoAlgorithmCfg` schema doesn't include `eta`.
+        if self.alg_cfg.get("class_name") == "AMPPPO_WGAN_GP" and "eta" not in self.alg_cfg:
+            amp_eta = self.cfg.get("amp_eta", None)
+            if amp_eta is not None:
+                self.alg_cfg["eta"] = amp_eta
+
         # resolve dimensions of observations
         obs, extras = self.env.get_observations()
         num_obs = obs.shape[1]
@@ -860,6 +878,8 @@ class AmpOnPolicyRunner_25:
         # for it in range(start_iter, 1000):
             start = time.time()
             # Rollout
+            # AMP reward inference should be deterministic (disable Dropout/BatchNorm).
+            self.alg.discriminator.eval()
             with torch.inference_mode():
                 for _ in range(self.num_steps_per_env):
                     # Sample actions
@@ -935,6 +955,8 @@ class AmpOnPolicyRunner_25:
                 if self.training_type == "rl":
                     self.alg.compute_returns(privileged_obs)
 
+            # Switch back to training mode for discriminator/policy updates.
+            self.alg.discriminator.train()
             # update policy
             loss_dict = self.alg.update()
 

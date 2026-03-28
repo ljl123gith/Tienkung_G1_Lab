@@ -177,6 +177,8 @@ class G1Env_25(VecEnv):
         self.add_noise = self.cfg.noise.add_noise
 
         self.episode_length_buf = torch.zeros(self.num_envs, device=self.device, dtype=torch.long)
+        # 记录每个 env 在当前 episode 内的最大水平线速度（m/s）
+        self.episode_max_speed = torch.zeros(self.num_envs, device=self.device, dtype=torch.float)
         self.sim_step_counter = 0
         self.time_out_buf = torch.zeros(self.num_envs, device=self.device, dtype=torch.bool)
 
@@ -408,6 +410,14 @@ class G1Env_25(VecEnv):
 
         reward_extras = self.reward_manager.reset(env_ids)
         self.extras["log"].update(reward_extras)
+
+        # 将本 episode 的最大水平速度（按 env 取均值）写入日志，供 Runner 打印
+        if env_ids.numel() > 0:
+            ep_max_speed = self.episode_max_speed[env_ids]
+            # 记录平均和全局最大值（为简单起见，这里只输出平均值；如需全局可再加键）
+            self.extras["log"]["episode/max_speed_xy"] = ep_max_speed.mean()
+            # 重置这些 env 的统计，以便下一轮 episode 重新累计
+            self.episode_max_speed[env_ids] = 0.0
         self.extras["time_outs"] = self.time_out_buf
 
         self.command_generator.reset(env_ids)
@@ -457,6 +467,11 @@ class G1Env_25(VecEnv):
         if getattr(self, "use_gait_obs", False):
             self.avg_feet_force_per_step /= self.cfg.sim.decimation
             self.avg_feet_speed_per_step /= self.cfg.sim.decimation
+
+        # 更新每个 env 在本 episode 内的最大水平速度（基于 world 根部线速度的 xy 范数）
+        root_lin_vel_w = self.robot.data.root_lin_vel_w  # (num_envs, 3)
+        lin_speed_xy = torch.norm(root_lin_vel_w[:, :2], dim=-1)  # (num_envs,)
+        self.episode_max_speed = torch.maximum(self.episode_max_speed, lin_speed_xy)
 
         if not self.headless:
             self.sim.render()

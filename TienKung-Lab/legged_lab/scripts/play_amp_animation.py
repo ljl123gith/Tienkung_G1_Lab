@@ -25,6 +25,7 @@ from legged_lab.utils import task_registry
 # local imports
 import legged_lab.utils.cli_args as cli_args  # isort: skip
 import numpy as np
+import time as pytime
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Train an RL agent with RSL-RL.")
@@ -33,6 +34,18 @@ parser.add_argument("--num_envs", type=int, default=None, help="Number of enviro
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
 parser.add_argument("--save_path", type=str, default=None, help="Path to save the txt file")
 parser.add_argument("--fps", type=float, default=30.0, help="Target fps")
+parser.add_argument(
+    "--loop",
+    action=argparse.BooleanOptionalAction,
+    default=True,
+    help="Loop motion playback (ignored when --save_path is set).",
+)
+parser.add_argument(
+    "--cycle_files",
+    action=argparse.BooleanOptionalAction,
+    default=False,
+    help="When looping and multiple motion files are provided, cycle through files each loop.",
+)
 
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
@@ -72,19 +85,62 @@ def play_amp_animation():
     env_class = task_registry.get_task_class(env_class_name)
     env = env_class(env_cfg, args_cli.headless)
 
-    frame_cnt = 0
+    if env.motion_len <= 0:
+        raise RuntimeError("env.motion_len is 0. No motion visualization frames loaded.")
+
+    dt = 1.0 / float(args_cli.fps)
+    loop_enabled = bool(args_cli.loop) and (args_cli.save_path is None)
+
+    # Use the env's motion file frame duration to define one "cycle" duration in seconds.
+    frame_duration = float(getattr(env, "_visual_frame_duration", dt))
+    motion_duration_s = float(env.motion_len) * frame_duration
+    if motion_duration_s <= 0:
+        motion_duration_s = float(env.motion_len) * dt
+
+    frame_in_motion = 0
     all_frames = []
+
     while simulation_app.is_running():
-        while True:
-            time = (frame_cnt % (env.motion_len)) * (1.0/args_cli.fps)
-            frame = env.visualize_motion(time)
-            if args_cli.save_path:
-                frame = frame.cpu().numpy().reshape(-1)
-                all_frames.append(frame)
-            frame_cnt += 1
-            if frame_cnt >= (env.motion_len - 1):  
+        t_start = pytime.perf_counter()
+
+        # Time within the current motion clip
+        t_s = frame_in_motion * dt
+        if loop_enabled:
+            # Wrap time into [0, motion_duration_s)
+            t_s = t_s % motion_duration_s
+        frame = env.visualize_motion(t_s)
+
+        if args_cli.save_path:
+            frame_np = frame.cpu().numpy().reshape(-1)
+            all_frames.append(frame_np)
+
+        frame_in_motion += 1
+
+        # Stop conditions
+        if args_cli.save_path is not None:
+            # For saving, we export exactly one clip worth of frames at the requested fps.
+            if frame_in_motion * dt >= motion_duration_s:
                 break
-        break
+        elif not loop_enabled:
+            # Non-loop playback: play once then exit.
+            if frame_in_motion * dt >= motion_duration_s:
+                break
+        else:
+            # Loop playback: optionally cycle through multiple motion files per loop.
+            if frame_in_motion * dt >= motion_duration_s:
+                frame_in_motion = 0
+                if bool(args_cli.cycle_files) and hasattr(env, "_visual_frames") and len(env._visual_frames) > 0:
+                    env._visual_motion_index = (env._visual_motion_index + 1) % len(env._visual_frames)
+                    env.motion_len = len(env._visual_frames[env._visual_motion_index])
+                    env._visual_frame_duration = env._visual_frame_durations[env._visual_motion_index]
+                    frame_duration = float(env._visual_frame_duration)
+                    motion_duration_s = float(env.motion_len) * frame_duration
+
+        # Try to match the requested fps.
+        elapsed = pytime.perf_counter() - t_start
+        sleep_s = dt - elapsed
+        if sleep_s > 0:
+            pytime.sleep(sleep_s)
 
     if args_cli.save_path:
         all_frames_np = np.stack(all_frames, axis=0)
